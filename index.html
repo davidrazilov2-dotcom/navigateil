@@ -254,19 +254,24 @@ try{maplibregl.setRTLTextPlugin('https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.
 const STYLE=n=>'https://tiles.openfreemap.org/styles/'+n;
 const isNight=()=>{const h=new Date().getHours();return ST.night==='on'||(ST.night==='auto'&&(h>=18||h<6))};
 let curStyle=isNight()?'dark':ST.style;
-const map=new maplibregl.Map({container:'map',style:STYLE(curStyle),bounds:[[34.25,29.45],[35.9,33.35]],maxBounds:[[33.0,28.3],[37.0,34.4]],attributionControl:false,dragRotate:true,touchPitch:true,maxPitch:70});
+const map=new maplibregl.Map({container:'map',style:STYLE(curStyle),bounds:[[34.25,29.45],[35.9,33.35]],minZoom:1,renderWorldCopies:true,attributionControl:false,dragRotate:true,touchPitch:true,maxPitch:70});
 map.touchZoomRotate.enableRotation();
 document.body.classList.toggle('night',curStyle==='dark');
 map.on('error',e=>{if(curStyle==='dark'&&!map.isStyleLoaded()){curStyle='positron';map.setStyle(STYLE('positron'))}});
 
 let routeGJ=null,altsGJ={type:'FeatureCollection',features:[]};
 const EMPTY={type:'FeatureCollection',features:[]};
+// עברית למעלה, ובשורה מתחת השם בשפת המקור (אם הוא שונה)
+const LABEL=['case',
+  ['all',['has','name:he'],['has','name'],['!=',['get','name:he'],['get','name']]],
+  ['format',['get','name:he'],{},'\n',{},['get','name'],{'font-scale':0.78}],
+  ['coalesce',['get','name:he'],['get','name'],['get','name:latin']]];
 function firstSymbol(){const l=(map.getStyle().layers||[]).find(x=>x.type==='symbol');return l&&l.id}
 function onStyle(){
   // תוויות בעברית, ועיצוב אישי
   for(const l of map.getStyle().layers||[]){
     if(l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name')){
-      try{map.setLayoutProperty(l.id,'text-field',['coalesce',['get','name:he'],['get','name'],['get','name:latin']])}catch{}
+      try{map.setLayoutProperty(l.id,'text-field',LABEL)}catch{}
     }
     if(l.id==='water'&&curStyle!=='dark')try{map.setPaintProperty(l.id,'fill-color','#9fd3f0')}catch{}
   }
@@ -317,7 +322,7 @@ const NOM='https://nominatim.openstreetmap.org/';
 const IL_BOX='34.2,29.4,35.95,33.4';
 const uniq=a=>a.filter((x,i)=>x&&a.indexOf(x)===i);
 function fromNom(p,num){
-  const a=p.address||{},city=a.city||a.town||a.village||a.municipality||a.hamlet||'',state=a.state||'';
+  const a=p.address||{},city=a.city||a.town||a.village||a.municipality||a.hamlet||'',state=[a.state,a.country_code&&a.country_code!=='il'?a.country:''].filter(Boolean).join(', ');
   let title,kind='place';
   if(a.house_number&&a.road){title=a.road+' '+a.house_number;kind='house'}
   else if(p.addresstype==='road'||p.category==='highway'){title=a.road||p.name;kind='street'}
@@ -334,7 +339,7 @@ function fromPhoton(f,num){
   else if(['city','town','village','district','locality'].includes(p.type)||p.osm_key==='place'){title=p.name;kind='city'}
   else title=p.name||p.street;
   const city=p.city||(kind==='city'?'':p.locality||p.county||'');
-  const sub=uniq([kind==='city'?'':city,p.state||''].filter(x=>x!==title)).join(', ');
+  const sub=uniq([kind==='city'?'':city,p.state||'',p.countrycode&&p.countrycode!=='IL'?p.country:''].filter(x=>x!==title)).join(', ');
   return {title,sub,ll:[c[1],c[0]],kind,approx:!!num&&kind==='street'};
 }
 async function geocode(q){
@@ -342,12 +347,12 @@ async function geocode(q){
   const near=S.me?`&lat=${S.me[0]}&lon=${S.me[1]}`:'';
   const nom=u=>fetch(u).then(r=>r.json()).then(j=>(Array.isArray(j)?j:[]).map(p=>fromNom(p,num))).catch(()=>[]);
   const jobs=[
-    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&bbox=${IL_BOX}${near}`).then(r=>r.json()).then(j=>(j.features||[]).map(f=>fromPhoton(f,num))).catch(()=>[]),
-    nom(`${NOM}search?format=jsonv2&addressdetails=1&limit=8&countrycodes=il&accept-language=he&q=${encodeURIComponent(q)}`)
+    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8${near}`).then(r=>r.json()).then(j=>(j.features||[]).map(f=>fromPhoton(f,num))).catch(()=>[]),
+    nom(`${NOM}search?format=jsonv2&addressdetails=1&limit=8&accept-language=he&q=${encodeURIComponent(q)}`)
   ];
   if(m){ // חיפוש מובנה: רחוב + מספר בית (+ עיר אם נכתבה)
     const city=m[3]?`&city=${encodeURIComponent(m[3])}`:'';
-    jobs.push(nom(`${NOM}search?format=jsonv2&addressdetails=1&limit=8&countrycodes=il&accept-language=he&street=${encodeURIComponent(m[2]+' '+m[1])}${city}`));
+    jobs.push(nom(`${NOM}search?format=jsonv2&addressdetails=1&limit=8&accept-language=he&street=${encodeURIComponent(m[2]+' '+m[1])}${city}`));
   }
   const all=(await Promise.all(jobs)).flat().filter(r=>r.title);
   const out=[];
@@ -448,7 +453,7 @@ async function catSearch(cat,chip){
   const vb=`${c[1]-d},${c[0]+d},${c[1]+d},${c[0]-d}`;
   let res=[];
   try{
-    res=await (await fetch(`${NOM}search?format=jsonv2&limit=15&accept-language=he&addressdetails=1&countrycodes=il&bounded=1&viewbox=${vb}&amenity=${cat}`)).json();
+    res=await (await fetch(`${NOM}search?format=jsonv2&limit=15&accept-language=he&addressdetails=1&bounded=1&viewbox=${vb}&amenity=${cat}`)).json();
     if(!Array.isArray(res)||!res.length)res=await (await fetch(`${NOM}search?format=jsonv2&limit=15&accept-language=he&addressdetails=1&bounded=1&viewbox=${vb}&q=${encodeURIComponent(CAT_HE[cat])}`)).json();
   }catch{toast('שגיאה בחיפוש, נסה שוב');chip.classList.remove('on');return}
   if(!Array.isArray(res)||!res.length){toast('לא נמצא שום דבר קרוב');chip.classList.remove('on');return}
