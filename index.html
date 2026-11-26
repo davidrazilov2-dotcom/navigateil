@@ -147,6 +147,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 #limit[hidden]{display:none!important}
 #lanes{display:flex;gap:4px;margin-top:7px;direction:ltr;justify-content:flex-end}
 #lanes:empty{display:none}
+#bMute{width:52px;height:52px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:24px;cursor:pointer;flex:none;align-self:center}
+#bMute.off{background:#ff4f6d}
 #lanes span{width:30px;height:34px;border-radius:7px;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:20px;font-weight:800;color:rgba(255,255,255,.3)}
 #lanes span.ok{background:rgba(51,204,255,.3);color:#fff}
 #camAlert{position:fixed;z-index:640;top:calc(max(12px,env(safe-area-inset-top)) + 104px);left:50%;transform:translateX(-50%);background:#ffcc00;color:#1d2733;font-weight:800;padding:9px 16px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none;white-space:nowrap}
@@ -224,6 +226,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 <div id="banner" class="nav-only"><div class="in">
   <div id="bArrow">↑</div>
   <div style="flex:1"><div id="bDist"></div><div id="bText"></div><div id="lanes"></div></div>
+  <button id="bMute" aria-label="השתק או הפעל קול">🔊</button>
 </div></div>
 <div id="navbar"><div class="grab"><i class="handle"></i><div class="in" id="navPeek">
   <div><div id="nEta"></div><div id="nRem"></div></div>
@@ -691,9 +694,12 @@ function say(t){
 }
 let actx;
 function beep(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g).connect(actx.destination);o.start();o.stop(actx.currentTime+.25)}catch{}}
-function syncMute(){$('mute').textContent=ST.voice?'🔊':'🔇'}
+function syncMute(){$('mute').textContent=$('bMute').textContent=ST.voice?'🔊':'🔇';$('bMute').classList.toggle('off',!ST.voice)}
+function shush(){try{speechSynthesis.cancel()}catch{}}
 syncMute();
-$('mute').onclick=()=>{ST.voice=!ST.voice;store('nv-set',ST);syncMute();if(!ST.voice)try{speechSynthesis.cancel()}catch{}};
+$('mute').onclick=$('bMute').onclick=()=>{ST.voice=!ST.voice;store('nv-set',ST);syncMute();if(!ST.voice){shush();toast('הקול כבוי 🔇',1500)}else toast('הקול פועל 🔊',1500)};
+// נגיעה בפס העליון עוצרת את המשפט שנאמר עכשיו
+$('banner').addEventListener('click',e=>{if(!e.target.closest('#bMute'))shush()});
 
 /* ===== מהירות מותרת ומצלמות (OpenStreetMap / Overpass) ===== */
 const OVP='https://overpass-api.de/api/interpreter';
@@ -830,7 +836,7 @@ function stopNav(msg){
   const tr=N.trip,arrived=!!msg;N.trip=null;
   if(arrived&&!N.sim&&N.dispPos){SV.parked={ll:N.dispPos,t:Date.now()};store('nv-saved',SV);syncPark()}
   $('limit').hidden=true;$('camAlert').style.display='none';$('lanes').innerHTML='';
-  N.on=false;recenter();document.body.classList.remove('nav');
+  N.on=false;if(!arrived)shush();recenter();document.body.classList.remove('nav');
   if(N.watch!=null)navigator.geolocation.clearWatch(N.watch);N.watch=null;
   clearInterval(N.simT);cancelAnimationFrame(N.raf);
   try{N.wake&&N.wake.release()}catch{}N.wake=null;
@@ -968,7 +974,7 @@ document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
 
 document.addEventListener('visibilitychange',()=>{if(N.on&&document.visibilityState==='visible'&&!N.wake)wakeOn()});
 /* עדכון אוטומטי: אם יש גרסה חדשה באתר, טוען אותה מיד במקום עותק ישן מהזיכרון */
-const VER='3.4';$('ver').textContent=VER;
+const VER='3.5';$('ver').textContent=VER;
 fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{
   if(j.v&&j.v!==VER&&!location.search.includes('v='+j.v))location.replace(location.pathname+'?v='+j.v);
 }).catch(()=>{});
