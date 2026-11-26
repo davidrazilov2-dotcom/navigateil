@@ -224,7 +224,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 <div id="setBg"><div class="card" id="settings" role="dialog" aria-label="הגדרות">
   <h2>הגדרות</h2>
   <div class="set"><label for="sStyle">עיצוב המפה<small>בשעות היום</small></label>
-    <select id="sStyle"><option value="liberty">צבעוני תלת-ממד</option><option value="bright">בהיר</option><option value="positron">נקי ומינימלי</option></select></div>
+    <select id="sStyle"><option value="nosim">נוסעים (מומלץ)</option><option value="liberty">צבעוני</option><option value="bright">בהיר</option><option value="positron">נקי ומינימלי</option></select></div>
   <div class="set"><label for="sNight">מצב לילה<small>"אוטומטי" = מ-18:00 עד 06:00</small></label>
     <select id="sNight"><option value="auto">אוטומטי</option><option value="on">תמיד</option><option value="off">כבוי</option></select></div>
   <div class="set"><label for="sSpeed">התראת מהירות<small>צפצוף והודעה קולית מעל המהירות</small></label>
@@ -243,7 +243,8 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const RAD=Math.PI/180;
 const load=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'))}catch{return d}};
 const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-const ST=load('nv-set',{night:'auto',speed:0,tolls:false,voice:true,style:'liberty',d3:true});
+const ST=load('nv-set',{night:'auto',speed:0,tolls:false,voice:true,style:'nosim',d3:true});
+if(!ST.v2){ST.style='nosim';ST.v2=1;store('nv-set',ST)}
 const SV=load('nv-saved',{home:null,work:null,recent:[]});
 // נקודות פנימיות הן [lat,lon]; MapLibre מקבל [lon,lat]
 const LL=p=>[p[1],p[0]];
@@ -251,29 +252,76 @@ function hav(a,b){const dLa=(b[0]-a[0])*RAD,dLo=(b[1]-a[1])*RAD,s=Math.sin(dLa/2
 
 /* ===== המפה ===== */
 try{maplibregl.setRTLTextPlugin('https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.3.0/dist/mapbox-gl-rtl-text.js',true)}catch{}
-const STYLE=n=>'https://tiles.openfreemap.org/styles/'+n;
-const isNight=()=>{const h=new Date().getHours();return ST.night==='on'||(ST.night==='auto'&&(h>=18||h<6))};
-let curStyle=isNight()?'dark':ST.style;
-const map=new maplibregl.Map({container:'map',style:STYLE(curStyle),bounds:[[34.25,29.45],[35.9,33.35]],minZoom:1,renderWorldCopies:true,attributionControl:false,dragRotate:true,touchPitch:true,maxPitch:70});
-map.touchZoomRotate.enableRotation();
-document.body.classList.toggle('night',curStyle==='dark');
-map.on('error',e=>{if(curStyle==='dark'&&!map.isStyleLoaded()){curStyle='positron';map.setStyle(STYLE('positron'))}});
-
-let routeGJ=null,altsGJ={type:'FeatureCollection',features:[]};
-const EMPTY={type:'FeatureCollection',features:[]};
 // עברית למעלה, ובשורה מתחת השם בשפת המקור (אם הוא שונה)
 const LABEL=['case',
   ['all',['has','name:he'],['has','name'],['!=',['get','name:he'],['get','name']]],
   ['format',['get','name:he'],{},'\n',{},['get','name'],{'font-scale':0.78}],
   ['coalesce',['get','name:he'],['get','name'],['get','name:latin']]];
+/* ===== עיצוב המפה "נוסעים" – יום ולילה ===== */
+const PAL={
+  day:{bg:'#f3f0ea',res:'#ece7df',ind:'#e6e1ea',wood:'#cfe7c2',grass:'#dff0d3',park:'#c8eab9',sand:'#f4e9c9',water:'#a6d8f7',wway:'#8ccaf0',bld:'#e2dbd1',bld3:'#ddd5ca',
+       mw:'#ffc247',mwc:'#e0952a',tr:'#ffd978',trc:'#d6a23c',pr:'#ffffff',prc:'#c7beb2',mn:'#ffffff',mnc:'#d9d2c8',rail:'#bdb5aa',brd:'#9b7fbf',txt:'#2a3440',sub:'#5d6b78',halo:'#ffffff',city:'#16202b'},
+  night:{bg:'#18212b',res:'#1e2833',ind:'#222a36',wood:'#1b3530',grass:'#1d332c',park:'#1b3a30',sand:'#2a2a24',water:'#0d3552',wway:'#14496d',bld:'#26313d',bld3:'#2b3744',
+       mw:'#d89634',mwc:'#7d5313',tr:'#a77a35',trc:'#5e4316',pr:'#3c4a58',prc:'#10161c',mn:'#323f4c',mnc:'#141b22',rail:'#3b4652',brd:'#8a74b0',txt:'#d6e0ea',sub:'#93a3b3',halo:'#0f161d',city:'#f0f5fa'}
+};
+const W=(a,b,c,d)=>['interpolate',['exponential',1.5],['zoom'],5,a,10,b,14,c,18,d];
+function nosimStyle(night){
+  const p=PAL[night?'night':'day'],cls=v=>['match',['get','class'],v,true,false];
+  const road=(id,classes,fill,cas,w,min)=>[
+    {id:id+'-c',type:'line',source:'omt','source-layer':'transportation',minzoom:min,filter:cls(classes),layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':cas,'line-width':W(w[0]+.6,w[1]+1.4,w[2]+2.2,w[3]+4)}},
+    {id:id,type:'line',source:'omt','source-layer':'transportation',minzoom:min,filter:cls(classes),layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':fill,'line-width':W(...w)}}];
+  const txt=(id,layer,filter,size,font,color,extra)=>({id,type:'symbol',source:'omt','source-layer':layer,filter,
+    layout:Object.assign({'text-field':LABEL,'text-font':[font],'text-size':size,'text-max-width':8,'text-line-height':1.15},extra||{}),
+    paint:{'text-color':color,'text-halo-color':p.halo,'text-halo-width':1.6}});
+  return {version:8,name:'nosim',glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources:{omt:{type:'vector',url:'https://tiles.openfreemap.org/planet'}},
+    layers:[
+      {id:'background',type:'background',paint:{'background-color':p.bg}},
+      {id:'landuse-res',type:'fill',source:'omt','source-layer':'landuse',filter:cls(['residential','suburb','neighbourhood']),paint:{'fill-color':p.res}},
+      {id:'landuse-ind',type:'fill',source:'omt','source-layer':'landuse',filter:cls(['industrial','commercial','retail','railway']),paint:{'fill-color':p.ind}},
+      {id:'landcover-sand',type:'fill',source:'omt','source-layer':'landcover',filter:cls(['sand']),paint:{'fill-color':p.sand}},
+      {id:'landcover-grass',type:'fill',source:'omt','source-layer':'landcover',filter:cls(['grass','farmland','wetland']),paint:{'fill-color':p.grass,'fill-opacity':.8}},
+      {id:'landcover-wood',type:'fill',source:'omt','source-layer':'landcover',filter:cls(['wood']),paint:{'fill-color':p.wood}},
+      {id:'park',type:'fill',source:'omt','source-layer':'park',paint:{'fill-color':p.park,'fill-opacity':.85}},
+      {id:'water',type:'fill',source:'omt','source-layer':'water',paint:{'fill-color':p.water}},
+      {id:'waterway',type:'line',source:'omt','source-layer':'waterway',paint:{'line-color':p.wway,'line-width':['interpolate',['linear'],['zoom'],8,.5,16,3]}},
+      {id:'building',type:'fill',source:'omt','source-layer':'building',minzoom:13,maxzoom:15,paint:{'fill-color':p.bld}},
+      {id:'boundary-country',type:'line',source:'omt','source-layer':'boundary',filter:['all',['==',['get','admin_level'],2],['!=',['get','maritime'],1]],paint:{'line-color':p.brd,'line-width':['interpolate',['linear'],['zoom'],2,.8,10,2.5],'line-dasharray':[3,2]}},
+      {id:'rail',type:'line',source:'omt','source-layer':'transportation',minzoom:10,filter:cls(['rail','transit']),paint:{'line-color':p.rail,'line-width':1.4,'line-dasharray':[4,3]}},
+      ...road('road-minor',['minor','service'],p.mn,p.mnc,[0,.3,3,18],12),
+      ...road('road-sec',['secondary','tertiary'],p.pr,p.prc,[.3,1.2,5,22],8),
+      ...road('road-pri',['primary'],p.pr,p.prc,[.5,1.8,6.5,26],6),
+      ...road('road-trunk',['trunk'],p.tr,p.trc,[.6,2.2,7.5,28],5),
+      ...road('road-mw',['motorway'],p.mw,p.mwc,[.8,2.6,8.5,30],4),
+      {id:'building-3d',type:'fill-extrusion',source:'omt','source-layer':'building',minzoom:15,paint:{'fill-extrusion-color':p.bld3,'fill-extrusion-height':['coalesce',['get','render_height'],6],'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':.85}},
+      txt('water-name','water_name',['!=',['get','class'],'lake'],['interpolate',['linear'],['zoom'],2,11,8,15],'Noto Sans Italic','#2f78ad',{'text-letter-spacing':.1}),
+      {id:'road-name',type:'symbol',source:'omt','source-layer':'transportation_name',minzoom:13,
+        layout:{'symbol-placement':'line','text-field':['coalesce',['get','name:he'],['get','name']],'text-font':['Noto Sans Regular'],'text-size':['interpolate',['linear'],['zoom'],13,11,18,15]},
+        paint:{'text-color':p.txt,'text-halo-color':p.halo,'text-halo-width':1.8}},
+      txt('place-small','place',cls(['suburb','neighbourhood','quarter','hamlet']),['interpolate',['linear'],['zoom'],11,11,16,14],'Noto Sans Regular',p.sub,{}),
+      Object.assign(txt('place-village','place',cls(['village']),['interpolate',['linear'],['zoom'],9,11,14,15],'Noto Sans Regular',p.txt),{minzoom:9}),
+      txt('place-town','place',cls(['town']),['interpolate',['linear'],['zoom'],7,12,14,18],'Noto Sans Bold',p.txt),
+      txt('place-city','place',cls(['city']),['interpolate',['linear'],['zoom'],4,12,10,18,14,24],'Noto Sans Bold',p.city),
+      txt('place-state','place',cls(['state']),['interpolate',['linear'],['zoom'],4,10,8,14],'Noto Sans Italic',p.sub,{'text-transform':'none'}),
+      Object.assign(txt('place-country','place',cls(['country']),['interpolate',['linear'],['zoom'],1,11,4,15,7,20],'Noto Sans Bold',p.brd),{maxzoom:9})
+    ]};
+}
+const STYLE=n=>n==='nosim'?nosimStyle(false):n==='nosim-dark'?nosimStyle(true):'https://tiles.openfreemap.org/styles/'+n;
+const isNight=()=>{const h=new Date().getHours();return ST.night==='on'||(ST.night==='auto'&&(h>=18||h<6))};
+let curStyle=isNight()?'nosim-dark':ST.style;
+const map=new maplibregl.Map({container:'map',style:STYLE(curStyle),bounds:[[34.25,29.45],[35.9,33.35]],minZoom:1,renderWorldCopies:true,attributionControl:false,dragRotate:true,touchPitch:true,maxPitch:70});
+map.touchZoomRotate.enableRotation();
+document.body.classList.toggle('night',curStyle==='nosim-dark');
+
+let routeGJ=null,altsGJ={type:'FeatureCollection',features:[]};
+const EMPTY={type:'FeatureCollection',features:[]};
 function firstSymbol(){const l=(map.getStyle().layers||[]).find(x=>x.type==='symbol');return l&&l.id}
 function onStyle(){
   // תוויות בעברית, ועיצוב אישי
   for(const l of map.getStyle().layers||[]){
-    if(l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name')){
+    if(!/^nosim/.test(curStyle)&&l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name')){
       try{map.setLayoutProperty(l.id,'text-field',LABEL)}catch{}
     }
-    if(l.id==='water'&&curStyle!=='dark')try{map.setPaintProperty(l.id,'fill-color','#9fd3f0')}catch{}
   }
   const before=firstSymbol();
   if(!map.getSource('alts'))map.addSource('alts',{type:'geojson',data:altsGJ});
@@ -288,8 +336,8 @@ map.on('style.load',onStyle);
 function setRouteData(coords){routeGJ=coords?{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:coords.map(LL)}}:null;const s=map.getSource('route');s&&s.setData(routeGJ||EMPTY)}
 function setAltsData(list){altsGJ={type:'FeatureCollection',features:list.map(o=>({type:'Feature',properties:{i:o.i},geometry:{type:'LineString',coordinates:o.c.map(LL)}}))};const s=map.getSource('alts');s&&s.setData(altsGJ)}
 function applyNight(){
-  const want=isNight()?'dark':ST.style;
-  document.body.classList.toggle('night',want==='dark');
+  const want=isNight()?'nosim-dark':ST.style;
+  document.body.classList.toggle('night',want==='nosim-dark');
   if(want!==curStyle){curStyle=want;map.setStyle(STYLE(want))}
 }
 setInterval(applyNight,60000);
