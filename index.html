@@ -75,6 +75,11 @@ body.nav #navbar{display:flex}
 #simTag{position:fixed;z-index:600;right:14px;bottom:calc(var(--navpeek,110px) + 14px);background:#ffcc00;color:#222;font-weight:700;font-size:13px;padding:6px 12px;border-radius:14px}
 #recenter{position:fixed;z-index:620;left:50%;transform:translateX(-50%);bottom:calc(var(--navpeek,110px) + 16px);height:48px;padding:0 22px;border:0;border-radius:24px;background:var(--nav);color:#fff;font:700 16px Rubik,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;display:none;white-space:nowrap}
 body.nav.free #recenter{display:block}
+#zoomBtns{position:fixed;z-index:620;right:12px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:10px}
+body.nav #zoomBtns{display:flex}
+#zoomBtns button{width:56px;height:56px;border-radius:50%;border:0;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28);font:700 30px/1 Rubik,sans-serif;color:var(--ink);cursor:pointer;touch-action:manipulation}
+#zoomBtns button:active{background:#e8f6fd}
+html,body{touch-action:manipulation;overscroll-behavior:none}
 #reroute{position:fixed;z-index:650;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--nav);color:#fff;padding:14px 22px;border-radius:16px;font-weight:700;display:none}
 .fab{position:fixed;z-index:500;inset-inline-start:12px;bottom:max(18px,env(safe-area-inset-bottom));width:52px;height:52px;border-radius:50%;border:0;background:#fff;box-shadow:0 4px 16px rgba(20,40,60,.25);cursor:pointer;display:grid;place-items:center;color:var(--blue-d)}
 .fab svg{width:24px;height:24px}
@@ -137,6 +142,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-o
 <div id="speed" class="nav-only"><b id="spd">0</b><small>קמ"ש</small></div>
 <div id="simTag" class="nav-only" hidden>מצב הדמיה</div>
 <button id="recenter">➤ חזרה לנסיעה</button>
+<div id="zoomBtns"><button id="zin" aria-label="הגדל">+</button><button id="zout" aria-label="הקטן">−</button></div>
 <div id="reroute">מחשב מסלול מחדש…</div>
 
 <button class="fab" id="locate" aria-label="המיקום שלי"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
@@ -338,7 +344,7 @@ const angDiff=(a,b)=>(((b-a)%360)+540)%360-180;
 
 async function startNav(sim){
   if(!R)return;
-  N.on=true;N.sim=sim;recenter();document.body.classList.add('nav');$('simTag').hidden=!sim;
+  N.on=true;N.sim=sim;N.zoomOff=0;recenter();document.body.classList.add('nav');$('simTag').hidden=!sim;
   map.dragging.disable();map.touchZoom.disable();map.doubleClickZoom.disable();map.scrollWheelZoom.disable();map.boxZoom.disable();
   meMarker&&meMarker.setOpacity(0);fromMarker&&map.removeLayer(fromMarker);fromMarker=null;
   sizeRot();R.lastK=-1;requestAnimationFrame(()=>navD.close());
@@ -458,7 +464,7 @@ function frame(now){
     carMarker.setLatLng(N.dispPos);
     const el=carMarker.getElement();if(el){const s=el.querySelector('svg');if(s)s.style.transform=`rotate(${h}deg)`}
     if(!N.free){
-      const z=N.zoom,pt=map.project(N.dispPos,z),off=innerHeight*.22;
+      const z=Math.max(10,Math.min(19,N.zoom+(N.zoomOff||0))),pt=map.project(N.dispPos,z),off=innerHeight*.22;
       const c=map.unproject(pt.add(L.point(Math.sin(h*RAD)*off,-Math.cos(h*RAD)*off)),z);
       map.setView(c,z,{animate:false});
       rot.style.transform=`rotate(${-h}deg)`;
@@ -466,6 +472,17 @@ function frame(now){
   }
   N.raf=requestAnimationFrame(frame);
 }
+/* ===== זום בזמן נהיגה ===== */
+function zoomBy(d){
+  if(N.free){map.setZoom(Math.max(10,Math.min(19,map.getZoom()+d)),{animate:false});enterFree();}
+  else N.zoomOff=Math.max(-6,Math.min(3,(N.zoomOff||0)+d));
+}
+$('zin').onclick=()=>zoomBy(1);$('zout').onclick=()=>zoomBy(-1);
+// מונע מהדפדפן להגדיל את כל הדף או לגלול אותו בזמן נסיעה
+rot.addEventListener('touchmove',e=>{if(N.on)e.preventDefault()},{passive:false});
+rot.addEventListener('touchstart',e=>{if(N.on&&e.touches.length>1)e.preventDefault()},{passive:false});
+['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>{if(N.on)e.preventDefault()},{passive:false}));
+
 /* ===== הזזת המפה בזמן נהיגה ===== */
 const ptrs=new Map();let pinch=null,freeT=null;
 function enterFree(){
