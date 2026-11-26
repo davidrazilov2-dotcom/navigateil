@@ -232,6 +232,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
   <div class="set"><label for="s3d">תצוגת תלת-ממד בנסיעה<small>מבט מוטה עם בניינים</small></label><input type="checkbox" class="sw" id="s3d"></div>
   <div class="set"><label for="sTolls">הימנעות מכבישי אגרה<small>למשל כביש 6 ומנהרות הכרמל</small></label><input type="checkbox" class="sw" id="sTolls"></div>
   <div class="set"><label for="sVoice">הוראות קוליות</label><input type="checkbox" class="sw" id="sVoice"></div>
+  <div class="set"><label>גרסה</label><span id="ver"></span></div>
   <div class="setFoot"><button id="clearSaved">מחק יעדים שמורים</button><button class="ok" id="closeSet">סגור</button></div>
 </div></div>
 
@@ -799,6 +800,11 @@ $('zin').onclick=()=>zoomBy(1);$('zout').onclick=()=>zoomBy(-1);
 document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
 
 document.addEventListener('visibilitychange',()=>{if(N.on&&document.visibilityState==='visible'&&!N.wake)wakeOn()});
+/* עדכון אוטומטי: אם יש גרסה חדשה באתר, טוען אותה מיד במקום עותק ישן מהזיכרון */
+const VER='3.3';$('ver').textContent=VER;
+fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{
+  if(j.v&&j.v!==VER&&!location.search.includes('v='+j.v))location.replace(location.pathname+'?v='+j.v);
+}).catch(()=>{});
 setTimeout(()=>{$('splash').classList.add('out');setTimeout(()=>$('splash').remove(),600)},900);
 }
 </script>
