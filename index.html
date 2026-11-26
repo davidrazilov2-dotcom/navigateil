@@ -143,6 +143,25 @@ body.has-route #compass{bottom:calc(var(--peek,200px) + 78px)}
 .poi{width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--blue-d);display:grid;place-items:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer}
 .car{width:58px;height:58px;display:block;filter:drop-shadow(0 4px 5px rgba(0,0,0,.4))}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+#limit{position:fixed;z-index:600;left:22px;bottom:calc(var(--navpeek,110px) + 100px);width:60px;height:60px;border-radius:50%;background:#fff;border:6px solid #e0262f;display:grid;place-items:center;font:800 22px/1 Rubik,sans-serif;color:#111;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+#limit[hidden]{display:none!important}
+#lanes{display:flex;gap:4px;margin-top:7px;direction:ltr;justify-content:flex-end}
+#lanes:empty{display:none}
+#lanes span{width:30px;height:34px;border-radius:7px;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:20px;font-weight:800;color:rgba(255,255,255,.3)}
+#lanes span.ok{background:rgba(51,204,255,.3);color:#fff}
+#camAlert{position:fixed;z-index:640;top:calc(max(12px,env(safe-area-inset-top)) + 104px);left:50%;transform:translateX(-50%);background:#ffcc00;color:#1d2733;font-weight:800;padding:9px 16px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none;white-space:nowrap}
+.cam{width:28px;height:28px;border-radius:8px;background:#ffcc00;border:2px solid #1d2733;display:grid;place-items:center;font-size:15px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.park{width:34px;height:34px;border-radius:50%;background:#fff;border:3px solid #0aa5dd;display:grid;place-items:center;font-size:18px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#mic.on{background:#ff4f6d;color:#fff;animation:pulse 1s infinite}
+#wx{color:var(--ink)!important}
+#sumBg{position:fixed;inset:0;z-index:850;background:rgba(10,20,30,.5);display:none;align-items:center;justify-content:center;padding:20px}
+#sumBg.open{display:flex}
+#summary{width:100%;max-width:400px;padding:22px;text-align:center}
+#summary h2{margin:0 0 14px;font-size:24px}
+.sumGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.sumGrid div{background:var(--field);border-radius:14px;padding:12px 8px}
+.sumGrid b{display:block;font-size:24px;font-weight:800;color:var(--blue-d)}
+.sumGrid span{font-size:13px;color:var(--mut)}
 @media(max-width:600px){.top,.sheet{max-width:none}#bDist{font-size:30px}#bArrow{width:58px;height:58px;font-size:38px}.stop{padding:0 16px}}
 @media(prefers-reduced-motion:reduce){#speed.over{animation:none}}
 </style>
@@ -168,6 +187,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
       <div class="row">
         <i class="dot b"></i>
         <input id="to" placeholder="לאן נוסעים? למשל: עמשא 16 אופקים" aria-label="יעד">
+        <button type="button" class="ibtn" id="mic" aria-label="חיפוש קולי">🎤</button>
         <button type="button" class="ibtn" id="clear" aria-label="נקה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         <div class="sugg card" id="s-to"></div>
       </div>
@@ -175,6 +195,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
     <div class="chips" id="chips">
       <button class="chip" data-place="home">🏠 בית</button>
       <button class="chip" data-place="work">💼 עבודה</button>
+      <button class="chip" id="parkChip" hidden>🚗 איפה חניתי</button>
       <button class="chip" data-cat="fuel">⛽ דלק</button>
       <button class="chip" data-cat="parking">🅿️ חניה</button>
       <button class="chip" data-cat="cafe">☕ קפה</button>
@@ -188,7 +209,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 
 <div class="sheet" id="sheet">
   <div class="card">
-    <div class="grab"><i class="handle"></i><div class="eta"><b id="dur"></b><span id="dist"></span><span id="arr"></span></div></div>
+    <div class="grab"><i class="handle"></i><div class="eta"><b id="dur"></b><span id="dist"></span><span id="arr"></span><span id="wx"></span></div></div>
     <div class="alts" id="alts"></div>
     <div class="btns" id="peekEnd">
       <button class="start" id="startNav">יוצאים לדרך!</button>
@@ -202,7 +223,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 
 <div id="banner" class="nav-only"><div class="in">
   <div id="bArrow">↑</div>
-  <div><div id="bDist"></div><div id="bText"></div></div>
+  <div style="flex:1"><div id="bDist"></div><div id="bText"></div><div id="lanes"></div></div>
 </div></div>
 <div id="navbar"><div class="grab"><i class="handle"></i><div class="in" id="navPeek">
   <div><div id="nEta"></div><div id="nRem"></div></div>
@@ -211,6 +232,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
   <button class="stop" id="stopNav">עצור</button>
 </div></div>
 <ul class="steps" id="navSteps"></ul></div>
+<div id="limit" hidden><span id="lim"></span></div>
+<div id="camAlert">📷 מצלמת מהירות</div>
 <div id="speed" class="nav-only"><b id="spd">0</b><small>קמ"ש</small></div>
 <div id="simTag" class="nav-only" hidden>מצב הדמיה</div>
 <div id="zoomBtns"><button id="zin" aria-label="הגדל">+</button><button id="zout" aria-label="הקטן">−</button></div>
@@ -220,15 +243,18 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 <button class="fab" id="compass" aria-label="צפון למעלה"><svg viewBox="0 0 30 30"><path d="M15 3 20 15H10Z" fill="#ff4f6d"/><path d="M15 27 10 15H20Z" fill="#9aa7b4"/><circle cx="15" cy="15" r="2" fill="#fff"/></svg></button>
 <button class="fab" id="locate" aria-label="המיקום שלי"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
 <div class="toast" id="toast"></div>
+<div id="sumBg"><div class="card" id="summary" role="dialog" aria-label="סיכום נסיעה"><h2 id="sumTitle">סיכום נסיעה</h2><div class="sumGrid" id="sumGrid"></div><button class="cta" id="sumOk">סגור</button></div></div>
 
 <div id="setBg"><div class="card" id="settings" role="dialog" aria-label="הגדרות">
   <h2>הגדרות</h2>
   <div class="set"><label for="sStyle">עיצוב המפה<small>בשעות היום</small></label>
     <select id="sStyle"><option value="nosim">נוסעים (מומלץ)</option><option value="liberty">צבעוני</option><option value="bright">בהיר</option><option value="positron">נקי ומינימלי</option></select></div>
-  <div class="set"><label for="sNight">מצב לילה<small>"אוטומטי" = מ-18:00 עד 06:00</small></label>
+  <div class="set"><label for="sNight">מצב לילה<small>"אוטומטי" = מהשקיעה ועד הזריחה</small></label>
     <select id="sNight"><option value="auto">אוטומטי</option><option value="on">תמיד</option><option value="off">כבוי</option></select></div>
   <div class="set"><label for="sSpeed">התראת מהירות<small>צפצוף והודעה קולית מעל המהירות</small></label>
     <select id="sSpeed"><option value="0">כבוי</option><option>50</option><option>60</option><option>70</option><option>80</option><option>90</option><option>100</option><option>110</option><option>120</option></select></div>
+  <div class="set"><label for="sAuto">התראה לפי המהירות המותרת<small>כשידועה המהירות בכביש. אחרת לפי הבחירה למעלה</small></label><input type="checkbox" class="sw" id="sAuto"></div>
+  <div class="set"><label for="sCam">התראות על מצלמות מהירות</label><input type="checkbox" class="sw" id="sCam"></div>
   <div class="set"><label for="s3d">תצוגת תלת-ממד בנסיעה<small>מבט מוטה עם בניינים</small></label><input type="checkbox" class="sw" id="s3d"></div>
   <div class="set"><label for="sTolls">הימנעות מכבישי אגרה<small>למשל כביש 6 ומנהרות הכרמל</small></label><input type="checkbox" class="sw" id="sTolls"></div>
   <div class="set"><label for="sVoice">הוראות קוליות</label><input type="checkbox" class="sw" id="sVoice"></div>
@@ -244,9 +270,9 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const RAD=Math.PI/180;
 const load=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'))}catch{return d}};
 const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-const ST=load('nv-set',{night:'auto',speed:0,tolls:false,voice:true,style:'nosim',d3:true});
+const ST=load('nv-set',{night:'auto',speed:0,tolls:false,voice:true,style:'nosim',d3:true,autoLimit:true,cams:true});
 if(!ST.v2){ST.style='nosim';ST.v2=1;store('nv-set',ST)}
-const SV=load('nv-saved',{home:null,work:null,recent:[]});
+const SV=load('nv-saved',{home:null,work:null,recent:[],parked:null,trips:[]});
 // נקודות פנימיות הן [lat,lon]; MapLibre מקבל [lon,lat]
 const LL=p=>[p[1],p[0]];
 function hav(a,b){const dLa=(b[0]-a[0])*RAD,dLo=(b[1]-a[1])*RAD,s=Math.sin(dLa/2)**2+Math.cos(a[0]*RAD)*Math.cos(b[0]*RAD)*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(s))}
@@ -308,7 +334,23 @@ function nosimStyle(night){
     ]};
 }
 const STYLE=n=>n==='nosim'?nosimStyle(false):n==='nosim-dark'?nosimStyle(true):'https://tiles.openfreemap.org/styles/'+n;
-const isNight=()=>{const h=new Date().getHours();return ST.night==='on'||(ST.night==='auto'&&(h>=18||h<6))};
+// זריחה ושקיעה לפי המיקום (משוואת הזריחה)
+function sunTimes(lat,lon,d){
+  const r=Math.PI/180,J=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),12)/864e5+2440587.5;
+  const n=Math.round(J-2451545+0.0008),Js=n-lon/360,M=(357.5291+0.98560028*Js)%360;
+  const C=1.9148*Math.sin(M*r)+0.02*Math.sin(2*M*r)+0.0003*Math.sin(3*M*r),lam=(M+C+282.9372)%360;
+  const Jt=2451545+Js+0.0053*Math.sin(M*r)-0.0069*Math.sin(2*lam*r),sd=Math.sin(lam*r)*Math.sin(23.4397*r);
+  const cw=(Math.sin(-0.833*r)-Math.sin(lat*r)*sd)/(Math.cos(lat*r)*Math.cos(Math.asin(sd)));
+  if(cw<-1||cw>1)return null;const w=Math.acos(cw)/r/360,toD=j=>new Date((j-2440587.5)*864e5);
+  return [toD(Jt-w),toD(Jt+w)];
+}
+const isNight=()=>{
+  if(ST.night!=='auto')return ST.night==='on';
+  let p=[31.5,34.8];try{if(S.me)p=S.me}catch{}
+  const now=new Date(),t=sunTimes(p[0],p[1],now);
+  if(!t){const h=now.getHours();return h>=18||h<6}
+  return now<t[0]||now>t[1];
+};
 let curStyle=isNight()?'nosim-dark':ST.style;
 const map=new maplibregl.Map({container:'map',style:STYLE(curStyle),bounds:[[34.25,29.45],[35.9,33.35]],minZoom:1,renderWorldCopies:true,attributionControl:false,dragRotate:true,touchPitch:true,maxPitch:70});
 map.touchZoomRotate.enableRotation();
@@ -587,7 +629,7 @@ function drawRoutes(onlySel){
   setAltsData(onlySel?[]:routes.map((r,i)=>({i,c:r.c})).filter(o=>o.i!==sel));
   setRouteData(R?R.c:null);
 }
-function selectRoute(i){if(!routes[i])return;sel=i;R=routes[i];drawRoutes();renderSheet()}
+function selectRoute(i){if(!routes[i])return;sel=i;R=routes[i];drawRoutes();renderSheet();loadCams(R)}
 function renderSheet(){
   $('dur').textContent=fmtDur(R.dur);$('dist').textContent=fmtDist(R.dist);$('arr').textContent='הגעה ב-'+clock(R.dur);
   const fast=routes.reduce((b,r,i)=>r.dur<routes[b].dur?i:b,0),short=routes.reduce((b,r,i)=>r.dist<routes[b].dist?i:b,0);
@@ -604,7 +646,7 @@ async function preview(){
   $('goBtn').disabled=true;$('goBtn').textContent='מחשב מסלול…';clearPois();
   try{
     const rts=await fetchRoutes(a,b,true);routes=rts.map(buildRoute);sel=0;R=routes[0];
-    drawRoutes();renderSheet();addRecent();
+    drawRoutes();renderSheet();addRecent();loadWeather(b);loadCams(R);
     $('sheet').style.display='block';document.body.classList.add('has-route');
     requestAnimationFrame(()=>{sheetD.close();fitRoutes()});
   }catch{toast('לא נמצא מסלול. נסה כתובות אחרות')}
@@ -618,14 +660,14 @@ $('swap').onclick=()=>{
   setPoint('from',tp,false);setPoint('to',fp,false,fv||'המיקום שלי');if(R)preview();
 };
 function clearRoute(){
-  R=null;routes=[];drawRoutes();
+  R=null;routes=[];drawRoutes();clearCams();
   $('sheet').style.display='none';document.body.classList.remove('has-route');
 }
 $('clear').onclick=()=>{$('to').value='';setPoint('to',null,false);clearRoute();clearPois()};
 $('cancel').onclick=clearRoute;
 
 /* ===== הגדרות ===== */
-function fillSet(){$('sNight').value=ST.night;$('sSpeed').value=String(ST.speed);$('sTolls').checked=ST.tolls;$('sVoice').checked=ST.voice;$('sStyle').value=ST.style;$('s3d').checked=ST.d3}
+function fillSet(){$('sAuto').checked=ST.autoLimit;$('sCam').checked=ST.cams;$('sNight').value=ST.night;$('sSpeed').value=String(ST.speed);$('sTolls').checked=ST.tolls;$('sVoice').checked=ST.voice;$('sStyle').value=ST.style;$('s3d').checked=ST.d3}
 $('openSet').onclick=()=>{fillSet();$('setBg').classList.add('open')};
 $('closeSet').onclick=()=>$('setBg').classList.remove('open');
 $('setBg').onclick=e=>{if(e.target.id==='setBg')$('setBg').classList.remove('open')};
@@ -633,6 +675,8 @@ $('sStyle').onchange=e=>{ST.style=e.target.value;store('nv-set',ST);applyNight()
 $('sNight').onchange=e=>{ST.night=e.target.value;store('nv-set',ST);applyNight()};
 $('sSpeed').onchange=e=>{ST.speed=+e.target.value;store('nv-set',ST)};
 $('s3d').onchange=e=>{ST.d3=e.target.checked;store('nv-set',ST)};
+$('sAuto').onchange=e=>{ST.autoLimit=e.target.checked;store('nv-set',ST)};
+$('sCam').onchange=e=>{ST.cams=e.target.checked;store('nv-set',ST);ST.cams?loadCams(R):clearCams()};
 $('sTolls').onchange=e=>{ST.tolls=e.target.checked;store('nv-set',ST);if(R&&!N.on)preview()};
 $('sVoice').onchange=e=>{ST.voice=e.target.checked;store('nv-set',ST);syncMute()};
 $('clearSaved').onclick=()=>{SV.home=SV.work=null;SV.recent=[];store('nv-saved',SV);toast('היעדים השמורים נמחקו')};
@@ -651,6 +695,112 @@ function syncMute(){$('mute').textContent=ST.voice?'🔊':'🔇'}
 syncMute();
 $('mute').onclick=()=>{ST.voice=!ST.voice;store('nv-set',ST);syncMute();if(!ST.voice)try{speechSynthesis.cancel()}catch{}};
 
+/* ===== מהירות מותרת ומצלמות (OpenStreetMap / Overpass) ===== */
+const OVP='https://overpass-api.de/api/interpreter';
+async function ovp(q){const r=await fetch(OVP,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});if(!r.ok)throw 0;return r.json()}
+const IL_LIM={'IL:urban':50,'IL:rural':80,'IL:trunk':90,'IL:motorway':110,'IL:living_street':30};
+function parseLimit(v){if(!v)return null;if(IL_LIM[v])return IL_LIM[v];const m=String(v).match(/^(\d+)\s*(mph)?/);if(!m)return null;return m[2]?Math.round(+m[1]*1.609):+m[1]}
+const LIM={segs:[],center:null,busy:false,cur:null};
+async function loadLimits(p){
+  if(LIM.busy||(LIM.center&&hav(LIM.center,p)<800))return;
+  LIM.busy=true;
+  try{
+    const j=await ovp(`[out:json][timeout:15];way(around:1500,${p[0]},${p[1]})[highway][maxspeed];out tags geom;`);
+    const segs=[];
+    for(const w of j.elements||[]){const v=parseLimit(w.tags&&w.tags.maxspeed);if(!v||!w.geometry)continue;
+      for(let i=0;i<w.geometry.length-1;i++){const a=[w.geometry[i].lat,w.geometry[i].lon],b=[w.geometry[i+1].lat,w.geometry[i+1].lon];segs.push({a,b,v,brg:bearing(a,b)})}}
+    LIM.segs=segs;LIM.center=p;
+  }catch{LIM.center=p}
+  LIM.busy=false;
+}
+function limitAt(p,head){
+  const kx=111320*Math.cos(p[0]*RAD),ky=110540;let best=null,bd=22;
+  for(const s of LIM.segs){
+    const ax=(s.a[1]-p[1])*kx,ay=(s.a[0]-p[0])*ky,bx=(s.b[1]-p[1])*kx,by=(s.b[0]-p[0])*ky,dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;
+    let t=L2?-(ax*dx+ay*dy)/L2:0;t=Math.max(0,Math.min(1,t));
+    let d=Math.hypot(ax+t*dx,ay+t*dy);const ad=Math.abs(angDiff(head,s.brg)),off=Math.min(ad,180-ad);if(off>40)d+=15;
+    if(d<bd){bd=d;best=s.v}
+  }
+  return best;
+}
+let camMarkers=[];
+function clearCams(){camMarkers.forEach(m=>m.remove());camMarkers=[]}
+async function loadCams(route){
+  clearCams();if(!ST.cams||!route)return;
+  let a=[90,180],b=[-90,-180];route.c.forEach(p=>{a=[Math.min(a[0],p[0]),Math.min(a[1],p[1])];b=[Math.max(b[0],p[0]),Math.max(b[1],p[1])]});
+  if((b[0]-a[0])*(b[1]-a[1])>16)return; // מסלול ענק – מדלגים
+  try{
+    const j=await ovp(`[out:json][timeout:20];node[highway=speed_camera](${a[0]-.01},${a[1]-.01},${b[0]+.01},${b[1]+.01});out;`);
+    if(route!==R)return;
+    route.cams=[];
+    for(const n of j.elements||[]){const ll=[n.lat,n.lon],q=nearest(ll[0],ll[1],true,route);if(q.d>45)continue;
+      route.cams.push({ll,along:q.along,lim:parseLimit(n.tags&&n.tags.maxspeed)});
+      camMarkers.push(marker(divEl('cam','📷'),ll))}
+    route.cams.sort((x,y)=>x.along-y.along);
+  }catch{}
+}
+
+/* ===== נתיבים ===== */
+const LANE={left:'↰','slight left':'↖','sharp left':'↰',straight:'↑','slight right':'↗',right:'↱','sharp right':'↱',uturn:'⤺',none:'↑'};
+function laneInfo(step){
+  const it=step.intersections&&step.intersections[0],L=it&&it.lanes;if(!L||L.length<2)return null;
+  const mod=step.maneuver.modifier;
+  const html=L.map(l=>{const ind=l.indications||['straight'];const k=l.valid&&ind.includes(mod)?mod:ind[0];return `<span class="${l.valid?'ok':''}">${LANE[k]||'↑'}</span>`}).join('');
+  const v=L.map(l=>l.valid),cnt=v.filter(Boolean).length;let say='';
+  if(cnt&&cnt<L.length){
+    const firstV=v.indexOf(true),lastV=v.lastIndexOf(true);
+    if(lastV===L.length-1&&v.slice(firstV).every(Boolean))say=cnt>1?`השתמש ב-${cnt} הנתיבים הימניים`:'השתמש בנתיב הימני';
+    else if(firstV===0&&v.slice(0,lastV+1).every(Boolean))say=cnt>1?`השתמש ב-${cnt} הנתיבים השמאליים`:'השתמש בנתיב השמאלי';
+  }
+  return {html,say};
+}
+
+/* ===== חיפוש קולי ===== */
+$('mic').onclick=()=>{
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('הדפדפן הזה לא תומך בחיפוש קולי');return}
+  try{
+    const r=new SR();r.lang='he-IL';r.interimResults=false;r.maxAlternatives=1;
+    $('mic').classList.add('on');
+    r.onresult=e=>{const t=e.results[0][0].transcript;$('to').value=t;$('to').dispatchEvent(new Event('input'));$('to').focus()};
+    r.onerror=()=>toast('לא שמעתי. נסה שוב');
+    r.onend=()=>$('mic').classList.remove('on');
+    r.start();
+  }catch{$('mic').classList.remove('on');toast('לא הצלחתי להפעיל את המיקרופון')}
+};
+
+/* ===== איפה חניתי ===== */
+let parkMarker=null;
+function syncPark(){$('parkChip').hidden=!SV.parked}
+syncPark();
+$('parkChip').onclick=()=>{
+  const p=SV.parked;if(!p)return;
+  parkMarker&&parkMarker.remove();parkMarker=marker(divEl('park','🚗'),p.ll);
+  flyTo(p.ll,17);
+  const t=new Date(p.t).toLocaleString('he-IL',{weekday:'long',hour:'2-digit',minute:'2-digit'});
+  toast(`חנית כאן (${t})`,3500);
+  $('to').value='🚗 הרכב שלי';setPoint('to',p.ll,false,'הרכב שלי');
+};
+
+/* ===== מזג אוויר ביעד ===== */
+function wxName(c){return c===0?'☀️ בהיר':c<=2?'🌤️ מעונן חלקית':c===3?'☁️ מעונן':c<=48?'🌫️ ערפל':c<=57?'🌦️ טפטוף':c<=67?'🌧️ גשם':c<=77?'❄️ שלג':c<=82?'🌧️ ממטרים':'⛈️ סופה'}
+async function loadWeather(ll){
+  $('wx').textContent='';
+  try{const j=await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${ll[0].toFixed(3)}&longitude=${ll[1].toFixed(3)}&current=temperature_2m,weather_code&timezone=auto`)).json();
+    const c=j.current;if(c)$('wx').textContent=`${wxName(c.weather_code)} ${Math.round(c.temperature_2m)}° ביעד`}catch{}
+}
+
+/* ===== סיכום נסיעה ===== */
+function showSummary(tr,title){
+  const mins=Math.max(1,(Date.now()-tr.start)/60000),km=tr.dist/1000,avg=km/(mins/60);
+  $('sumTitle').textContent=title||'סיכום נסיעה';
+  $('sumGrid').innerHTML=[[km>=10?km.toFixed(0):km.toFixed(1),'ק"מ'],[fmtDur(mins*60),'זמן נסיעה'],[Math.round(avg),'מהירות ממוצעת'],[Math.round(tr.max),'מהירות מקסימלית']]
+    .map(([v,l])=>`<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+  $('sumBg').classList.add('open');
+  SV.trips=[{t:tr.start,km:+km.toFixed(1),min:Math.round(mins),to:S.toName||''}].concat(SV.trips||[]).slice(0,20);store('nv-saved',SV);
+}
+$('sumOk').onclick=()=>$('sumBg').classList.remove('open');
+
 /* ===== מצב נסיעה ===== */
 const N={on:false,sim:false,watch:null,simT:null,simAlong:0,head:0,dispPos:null,dispHead:0,anim:null,zoom:17,zoomOff:0,raf:0,wake:null,rerouting:false,lastReroute:0,lastFix:null,free:false,lastWarn:0,remS:0};
 function bearing(a,b){const y=Math.sin((b[1]-a[1])*RAD)*Math.cos(b[0]*RAD),x=Math.cos(a[0]*RAD)*Math.sin(b[0]*RAD)-Math.sin(a[0]*RAD)*Math.cos(b[0]*RAD)*Math.cos((b[1]-a[1])*RAD);return (Math.atan2(y,x)/RAD+360)%360}
@@ -659,7 +809,7 @@ async function wakeOn(){try{N.wake=await navigator.wakeLock.request('screen');N.
 
 function startNav(sim){
   if(!R)return;
-  N.on=true;N.sim=sim;N.zoomOff=0;recenter();document.body.classList.add('nav');$('simTag').hidden=!sim;
+  N.on=true;N.sim=sim;N.zoomOff=0;N.trip={start:Date.now(),dist:0,max:0,last:null};LIM.cur=null;recenter();document.body.classList.add('nav');$('simTag').hidden=!sim;
   if(meMarker)meMarker.getElement().style.display='none';fromMarker&&fromMarker.remove();fromMarker=null;
   routes=[R];sel=0;drawRoutes(true);
   R.lastK=-1;requestAnimationFrame(()=>navD.close());
@@ -677,6 +827,9 @@ function startNav(sim){
   cancelAnimationFrame(N.raf);N.raf=requestAnimationFrame(frame);
 }
 function stopNav(msg){
+  const tr=N.trip,arrived=!!msg;N.trip=null;
+  if(arrived&&!N.sim&&N.dispPos){SV.parked={ll:N.dispPos,t:Date.now()};store('nv-saved',SV);syncPark()}
+  $('limit').hidden=true;$('camAlert').style.display='none';$('lanes').innerHTML='';
   N.on=false;recenter();document.body.classList.remove('nav');
   if(N.watch!=null)navigator.geolocation.clearWatch(N.watch);N.watch=null;
   clearInterval(N.simT);cancelAnimationFrame(N.raf);
@@ -684,7 +837,8 @@ function stopNav(msg){
   carMarker&&carMarker.remove();carMarker=null;$('speed').classList.remove('over');
   if(meMarker)meMarker.getElement().style.display='';
   map.easeTo({pitch:0,bearing:0,padding:{top:0,bottom:0,left:0,right:0},duration:400});
-  if(msg){toast(msg,4000);clearRoute()}
+  if(tr&&tr.dist>100)showSummary(tr,arrived?'הגעת ליעד! 🎉':'סיכום נסיעה');else if(msg)toast(msg,4000);
+  if(msg)clearRoute()
   else if(R){renderSheet();sheetD.close();setTimeout(fitRoutes,450)}
 }
 $('startNav').onclick=()=>startNav(false);
@@ -708,9 +862,9 @@ function simTick(){
   onFix(c[i][0]+(c[i+1][0]-c[i][0])*t,c[i][1]+(c[i+1][1]-c[i][1])*t,bearing(c[i],c[i+1]),v);
 }
 
-function nearest(lat,lon,full){
-  const c=R.c,kx=111320*Math.cos(lat*RAD),ky=110540;
-  const lo=full||R.last<0?0:Math.max(0,R.last-15),hi=full||R.last<0?c.length-2:Math.min(c.length-2,R.last+400);
+function nearest(lat,lon,full,RR){
+  RR=RR||R;const c=RR.c,kx=111320*Math.cos(lat*RAD),ky=110540;
+  const lo=full||RR.last<0?0:Math.max(0,RR.last-15),hi=full||RR.last<0?c.length-2:Math.min(c.length-2,RR.last+400);
   let best={i:0,t:0,d:1e12};
   for(let i=lo;i<=hi;i++){
     const ax=(c[i][1]-lon)*kx,ay=(c[i][0]-lat)*ky,bx=(c[i+1][1]-lon)*kx,by=(c[i+1][0]-lat)*ky;
@@ -718,7 +872,7 @@ function nearest(lat,lon,full){
     const d=Math.hypot(ax+t*dx,ay+t*dy);if(d<best.d)best={i,t,d};
   }
   if(c.length<2)best={i:0,t:0,d:hav([lat,lon],c[0])};
-  best.along=R.cum[best.i]+best.t*((R.cum[best.i+1]||R.cum[best.i])-R.cum[best.i]);
+  best.along=RR.cum[best.i]+best.t*((RR.cum[best.i+1]||RR.cum[best.i])-RR.cum[best.i]);
   return best;
 }
 
@@ -732,9 +886,14 @@ function onFix(lat,lon,heading,speed,first){
   const kmh=speed!=null&&!isNaN(speed)?speed*3.6:0;
   $('spd').textContent=speed!=null&&!isNaN(speed)?Math.round(kmh):'–';
   N.zoom=kmh>90?15.5:kmh>50?16.3:17;
-  const over=ST.speed&&kmh>ST.speed+3;
+  if(N.trip&&!first){if(N.trip.last){const dd=hav(N.trip.last,p);if(dd<500)N.trip.dist+=dd}N.trip.last=p;N.trip.max=Math.max(N.trip.max,kmh)}
+  loadLimits(p);
+  const lim=limitAt(p,N.head);
+  if(lim){$('lim').textContent=lim;$('limit').hidden=false}else $('limit').hidden=true;
+  const thr=ST.autoLimit&&lim?lim:ST.speed;
+  const over=thr&&kmh>thr+3;
   $('speed').classList.toggle('over',!!over);
-  if(over&&Date.now()-N.lastWarn>20000){N.lastWarn=Date.now();beep();setTimeout(()=>say('שים לב, אתה מעל '+ST.speed),300)}
+  if(over&&!N.sim&&Date.now()-N.lastWarn>20000){N.lastWarn=Date.now();beep();setTimeout(()=>say('שים לב, המהירות המותרת היא '+thr),300)}
   N.anim={from:N.dispPos||p,to:p,h0:N.dispHead,h1:N.dispHead+angDiff(N.dispHead,N.head),t0:performance.now(),dur:first?1:950};
   if(N.rerouting)return;
   let n=nearest(lat,lon);if(n.d>40)n=nearest(lat,lon,true);
@@ -749,9 +908,17 @@ function onFix(lat,lon,heading,speed,first){
     $('navSteps').innerHTML=R.steps.slice(k).map(s=>`<li><span class="ic">${icon(s)}</span><span>${esc(instr(s))}</span><span class="d">${s.distance?fmtDist(s.distance):''}</span></li>`).join('')}
   const st=R.steps[k],dTo=Math.max(0,R.sAlong[k]-along),txt=instr(st);
   $('bArrow').textContent=icon(st);$('bDist').textContent=fmtDist(dTo);$('bText').textContent=txt;
+  const ln=laneInfo(st);$('lanes').innerHTML=ln&&dTo<2000?ln.html:'';
   const farAt=Math.max(kmh,30)>80?1000:450;
-  if(dTo<=farAt&&dTo>160&&!R.spoken.has(k+'f')){R.spoken.add(k+'f');say('בעוד '+sayDist(dTo)+', '+txt)}
+  if(dTo<=farAt&&dTo>160&&!R.spoken.has(k+'f')){R.spoken.add(k+'f');say('בעוד '+sayDist(dTo)+', '+txt+(ln&&ln.say?'. '+ln.say:''))}
   else if(dTo<=70&&!R.spoken.has(k+'n')){R.spoken.add(k+'n');R.spoken.add(k+'f');say(st.maneuver.type==='arrive'?'היעד לפניך':txt)}
+  // מצלמות מהירות לפנינו
+  const cam=(R.cams||[]).find(c=>c.along>along-10);
+  if(cam&&ST.cams){const cd=cam.along-along;
+    $('camAlert').style.display=cd<700?'block':'none';$('camAlert').textContent='📷 מצלמת מהירות בעוד '+fmtDist(Math.max(0,cd))+(cam.lim?` · ${cam.lim} קמ"ש`:'');
+    const key='cam'+Math.round(cam.along);
+    if(cd<=600&&cd>80&&!R.spoken.has(key)){R.spoken.add(key);beep();setTimeout(()=>say('מצלמת מהירות בעוד '+sayDist(cd)),300)}}
+  else $('camAlert').style.display='none';
   N.remS=R.dur*rem/R.total;
   $('nEta').textContent=clock(N.remS);$('nRem').textContent=fmtDur(N.remS)+' · '+fmtDist(rem);
   setRouteData([p].concat(R.c.slice(n.i+1)));
@@ -759,7 +926,7 @@ function onFix(lat,lon,heading,speed,first){
 
 async function reroute(p){
   N.rerouting=true;N.lastReroute=Date.now();$('reroute').style.display='block';say('מחשב מסלול מחדש');
-  try{const rts=await fetchRoutes(p,S.to,false);R=buildRoute(rts[0]);R.lastK=-1;routes=[R];sel=0;drawRoutes(true);N.simAlong=0}
+  try{const rts=await fetchRoutes(p,S.to,false);R=buildRoute(rts[0]);R.lastK=-1;routes=[R];sel=0;drawRoutes(true);N.simAlong=0;loadCams(R)}
   catch{toast('לא הצלחתי לחשב מסלול חדש')}
   if(R)R.off=0;
   N.rerouting=false;$('reroute').style.display='none';
@@ -801,7 +968,7 @@ document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
 
 document.addEventListener('visibilitychange',()=>{if(N.on&&document.visibilityState==='visible'&&!N.wake)wakeOn()});
 /* עדכון אוטומטי: אם יש גרסה חדשה באתר, טוען אותה מיד במקום עותק ישן מהזיכרון */
-const VER='3.3';$('ver').textContent=VER;
+const VER='3.4';$('ver').textContent=VER;
 fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{
   if(j.v&&j.v!==VER&&!location.search.includes('v='+j.v))location.replace(location.pathname+'?v='+j.v);
 }).catch(()=>{});
